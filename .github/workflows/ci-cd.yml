@@ -1,0 +1,68 @@
+name: GitOps Helm CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    name: 🐳 Build & Push to Docker Hub
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.vars.outputs.sha_short }}
+    steps:
+      - name: ⬇️ Checkout Código
+        uses: actions/checkout@v4
+
+      - name: 🔑 Obtener Short SHA del Commit
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔓 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 📦 Build and Push Imagen
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/nginx-gitops-app:${{ steps.vars.outputs.sha_short }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/nginx-gitops-app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update-gitops:
+    name: 🐙 Update GitOps (Helm Values)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout Repositorio GitOps
+        uses: actions/checkout@v4
+        with:
+          repository: '${{ github.repository_owner }}/02-gitops-repo'
+          token: ${{ secrets.GITOPS_GITHUB_TOKEN }} # Tu PAT con permisos de escritura
+
+      - name: ✍️ Actualizar Tag en values.yaml con yq
+        run: |
+          # Modificamos el tag de la imagen usando yq (preinstalado en el runner)
+          yq eval '.image.tag = "${{ needs.build-and-push.outputs.short_sha }}"' -i charts/react-app/values.yaml
+
+      - name: 🚀 Git Commit and Push a Infraestructura
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions Bot"
+          git add charts/react-app/values.yaml
+          
+          if git diff --staged --quiet; then
+            echo "La infraestructura ya está actualizada."
+          else
+            git commit -m "chore(gitops): automatizado - update image tag to ${{ needs.build-and-push.outputs.short_sha }} [skip ci]"
+            git push origin main
+          fi
