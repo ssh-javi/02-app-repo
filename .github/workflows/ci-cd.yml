@@ -52,7 +52,7 @@ jobs:
       - name: ✍️ Actualizar Tag en values.yaml con yq
         run: |
           # Modificamos el tag de la imagen usando yq (preinstalado en el runner)
-          yq eval '.image.tag = "${{ needs.build-and-push.outputs.short_sha }}"' -i charts/react-app/values.yaml
+          yq eval '.image.tag = "${{ needs.build-and-push.outputs.short_sha }}"' -i charts/nginx-app/values.yaml
 
       - name: 🚀 Git Commit and Push a Infraestructura
         run: |
