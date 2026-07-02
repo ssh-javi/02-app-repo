@@ -46,7 +46,7 @@ jobs:
       - name: ⬇️ Checkout Repositorio GitOps
         uses: actions/checkout@v4
         with:
-          repository: '${{ github.repository_owner }}/02-gitops-repo'
+          repository: '${{ github.repository_owner }}/02-infra-repo'
           token: ${{ secrets.GITOPS_GITHUB_TOKEN }} # Tu PAT con permisos de escritura
 
       - name: ✍️ Actualizar Tag en values.yaml con yq
